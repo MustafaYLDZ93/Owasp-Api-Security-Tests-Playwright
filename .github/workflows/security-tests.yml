@@ -1,5 +1,8 @@
 name: OWASP API Security Tests
 
+# NOTE: All tests use APIRequestContext (pure HTTP, no browser).
+# Browser installation is intentionally skipped — saves ~1.5 min per job.
+
 on:
   workflow_dispatch:
     inputs:
@@ -17,9 +20,9 @@ env:
   NODE_VERSION: '20'
 
 jobs:
-  # ─── Job 1: Güvenli API — tüm testler PASS beklenir ────────────────────────
+  # ─── Job 1: Güvenli API — tüm testler PASS beklenir ───────────────────────
   test-secure:
-    name: Secure API — All tests should PASS
+    name: "🔒 Secure API — All tests should PASS"
     runs-on: ubuntu-latest
     if: ${{ inputs.test_target == 'secure' || inputs.test_target == 'both' }}
 
@@ -27,25 +30,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install root dependencies
-        run: npm ci
+      - name: Install dependencies
+        run: npm ci && cd api-server && npm ci
 
-      - name: Install API server dependencies
-        run: cd api-server && npm ci
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+      # No browser install needed — tests use APIRequestContext (pure HTTP)
 
       - name: Run security tests (Secure API)
         run: npx playwright test --reporter=list,html
         env:
-          API_BASE_URL: http://localhost:3000
           CI: true
 
       - name: Upload HTML report
@@ -56,9 +54,9 @@ jobs:
           path: playwright-report/
           retention-days: 30
 
-  # ─── Job 2: Açıklı API — bazı testler FAIL beklenir ────────────────────────
+  # ─── Job 2: Açıklı API — bazı testler FAIL beklenir ───────────────────────
   test-vulnerable:
-    name: Vulnerable API — Security flaws should be DETECTED (FAILs expected)
+    name: "🔓 Vulnerable API — Security flaws DETECTED (FAILs expected)"
     runs-on: ubuntu-latest
     if: ${{ inputs.test_target == 'vulnerable' || inputs.test_target == 'both' }}
 
@@ -66,26 +64,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install root dependencies
-        run: npm ci
+      - name: Install dependencies
+        run: npm ci && cd api-server && npm ci
 
-      - name: Install API server dependencies
-        run: cd api-server && npm ci
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+      # No browser install needed — tests use APIRequestContext (pure HTTP)
 
       - name: Run security tests (Vulnerable API)
-        # Failures are expected here — exit code ignored so workflow doesn't abort
+        # FAILs are expected — exit code ignored so the job doesn't abort
         run: npx playwright test --config=playwright.config.vulnerable.ts --reporter=list,html || true
         env:
-          API_BASE_URL: http://localhost:3001
           CI: true
 
       - name: Upload HTML report
@@ -96,12 +89,12 @@ jobs:
           path: playwright-report-vulnerable/
           retention-days: 30
 
-      - name: Print vulnerability summary
+      - name: Vulnerability summary
         if: always()
         run: |
-          echo "======================================"
+          echo "========================================"
           echo "  Vulnerability Detection Summary"
-          echo "======================================"
-          echo "FAILED tests = detected security flaws"
-          echo "PASSED tests = controls were missing"
-          echo "======================================"
+          echo "========================================"
+          echo "  FAILED tests = security flaws detected"
+          echo "  PASSED tests = controls were missing"
+          echo "========================================"
