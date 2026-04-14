@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OWASP API Security Top 10 — Playwright Test Suite</title>
+<style>
+  :root {
+    --bg: #020b12;
+    --bg2: #051520;
+    --bg3: #0a2030;
+    --cyan: #00e5ff;
+    --green: #00ff88;
+    --red: #ff2d55;
+    --yellow: #ffd600;
+    --dim: #1a3a4a;
+    --text: #c8e6f0;
+    --text-dim: #4a7a8a;
+    --border: #0d3040;
+    --glow-cyan: 0 0 20px rgba(0,229,255,.4), 0 0 60px rgba(0,229,255,.1);
+    --glow-green: 0 0 20px rgba(0,255,136,.4), 0 0 60px rgba(0,255,136,.1);
+    --glow-red: 0 0 20px rgba(255,45,85,.4);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Courier New',Courier,monospace;
+    overflow-x:hidden;
+    line-height:1.6;
+  }
+
+  /* ── CANVAS BACKGROUND ── */
+  #matrix-canvas{
+    position:fixed;top:0;left:0;width:100%;height:100%;
+    z-index:0;opacity:.06;pointer-events:none;
+  }
+
+  /* ── SCANLINE OVERLAY ── */
+  body::after{
+    content:'';position:fixed;top:0;left:0;width:100%;height:100%;
+    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.15) 2px,rgba(0,0,0,.15) 4px);
+    pointer-events:none;z-index:1;
+  }
+
+  .wrapper{position:relative;z-index:2}
+
+  /* ── NAV ── */
+  nav{
+    position:sticky;top:0;z-index:100;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 40px;
+    background:rgba(2,11,18,.85);
+    backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--border);
+  }
+  .nav-logo{
+    font-size:.75rem;letter-spacing:.2em;color:var(--cyan);
+    text-transform:uppercase;display:flex;align-items:center;gap:8px;
+  }
+  .nav-logo::before{
+    content:'';width:8px;height:8px;background:var(--cyan);
+    border-radius:50%;box-shadow:var(--glow-cyan);
+    animation:pulse 2s infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .nav-links{display:flex;gap:24px}
+  .nav-links a{
+    color:var(--text-dim);text-decoration:none;font-size:.75rem;
+    letter-spacing:.15em;text-transform:uppercase;
+    transition:color .2s;
+  }
+  .nav-links a:hover{color:var(--cyan)}
+
+  /* ── HERO ── */
+  .hero{
+    min-height:100vh;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    padding:80px 40px 60px;text-align:center;
+    position:relative;overflow:hidden;
+  }
+  .hero-grid{
+    position:absolute;inset:0;
+    background-image:
+      linear-gradient(rgba(0,229,255,.04) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(0,229,255,.04) 1px,transparent 1px);
+    background-size:60px 60px;
+    mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black,transparent);
+  }
+  .hero-eyebrow{
+    font-size:.7rem;letter-spacing:.35em;color:var(--cyan);
+    text-transform:uppercase;margin-bottom:24px;
+    display:flex;align-items:center;gap:12px;
+  }
+  .hero-eyebrow::before,.hero-eyebrow::after{
+    content:'';flex:1;max-width:60px;height:1px;background:var(--cyan);opacity:.4;
+  }
+  .hero-title{
+    font-size:clamp(2.4rem,7vw,5.5rem);
+    font-weight:700;line-height:1.05;
+    letter-spacing:-.02em;
+    color:#fff;
+    text-shadow:0 0 40px rgba(0,229,255,.3);
+    margin-bottom:8px;
+  }
+  .hero-title span{color:var(--cyan)}
+  .hero-subtitle{
+    font-size:clamp(1rem,2.5vw,1.6rem);
+    color:var(--green);letter-spacing:.2em;
+    text-transform:uppercase;margin-bottom:28px;
+    font-weight:400;
+  }
+  .hero-desc{
+    max-width:580px;font-size:.95rem;color:var(--text-dim);
+    line-height:1.8;margin-bottom:40px;
+  }
+  .hero-stats{
+    display:flex;gap:16px;justify-content:center;
+    flex-wrap:wrap;margin-bottom:44px;
+  }
+  .stat-badge{
+    padding:8px 20px;border:1px solid var(--cyan);
+    color:var(--cyan);font-size:.8rem;letter-spacing:.15em;
+    text-transform:uppercase;border-radius:2px;
+    background:rgba(0,229,255,.05);
+    box-shadow:var(--glow-cyan);
+    animation:fadeUp .6s ease both;
+  }
+  .stat-badge:nth-child(2){animation-delay:.1s}
+  .stat-badge:nth-child(3){animation-delay:.2s}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  .hero-cta{
+    display:inline-flex;align-items:center;gap:10px;
+    padding:14px 32px;
+    background:transparent;
+    border:1px solid var(--cyan);
+    color:var(--cyan);
+    text-decoration:none;
+    font-family:inherit;font-size:.85rem;letter-spacing:.2em;
+    text-transform:uppercase;cursor:pointer;
+    transition:all .25s;position:relative;overflow:hidden;
+  }
+  .hero-cta::before{
+    content:'';position:absolute;inset:0;
+    background:var(--cyan);transform:translateX(-101%);
+    transition:transform .25s;z-index:-1;
+  }
+  .hero-cta:hover{color:#000}
+  .hero-cta:hover::before{transform:translateX(0)}
+  .hero-cta svg{width:16px;height:16px;fill:currentColor}
+
+  /* ── SECTION COMMON ── */
+  section{padding:80px 40px;max-width:1200px;margin:0 auto}
+  .section-header{margin-bottom:48px;text-align:center}
+  .section-label{
+    font-size:.65rem;letter-spacing:.4em;color:var(--cyan);
+    text-transform:uppercase;display:block;margin-bottom:12px;
+  }
+  .section-title{
+    font-size:clamp(1.6rem,3.5vw,2.4rem);color:#fff;
+    font-weight:700;letter-spacing:-.01em;
+  }
+  .section-divider{
+    width:60px;height:2px;background:var(--cyan);
+    box-shadow:var(--glow-cyan);margin:16px auto 0;
+  }
+
+  /* ── HOW IT WORKS ── */
+  .modes{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:900px;margin:0 auto}
+  @media(max-width:700px){.modes{grid-template-columns:1fr}}
+  .mode-card{
+    border:1px solid var(--border);padding:36px;
+    background:var(--bg2);position:relative;overflow:hidden;
+    transition:transform .3s,border-color .3s;
+  }
+  .mode-card::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  }
+  .mode-card.secure::before{background:var(--green);box-shadow:var(--glow-green)}
+  .mode-card.vuln::before{background:var(--red);box-shadow:var(--glow-red)}
+  .mode-card.secure{border-color:rgba(0,255,136,.2)}
+  .mode-card.vuln{border-color:rgba(255,45,85,.2)}
+  .mode-card:hover{transform:translateY(-4px)}
+  .mode-card.secure:hover{border-color:rgba(0,255,136,.5)}
+  .mode-card.vuln:hover{border-color:rgba(255,45,85,.5)}
+  .mode-icon{font-size:2rem;margin-bottom:16px;display:block}
+  .mode-title{font-size:1.1rem;color:#fff;margin-bottom:16px;font-weight:700}
+  .mode-cmd{
+    background:#000;border:1px solid var(--border);
+    padding:12px 16px;font-size:.78rem;color:var(--green);
+    margin-bottom:20px;overflow-x:auto;white-space:nowrap;
+    border-radius:2px;
+  }
+  .mode-cmd::before{content:'$ ';color:var(--text-dim)}
+  .mode-result{
+    font-size:.82rem;font-weight:700;letter-spacing:.05em;
+  }
+  .mode-result.pass{color:var(--green)}
+  .mode-result.fail{color:var(--red)}
+
+  /* ── OWASP CARDS GRID ── */
+  .owasp-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
+    gap:20px;
+  }
+  .owasp-card{
+    border:1px solid var(--border);
+    background:var(--bg2);
+    overflow:hidden;cursor:pointer;
+    transition:border-color .3s,transform .3s;
+    position:relative;
+  }
+  .owasp-card:hover{transform:translateY(-3px)}
+  .owasp-card-header{
+    padding:24px;display:flex;
+    align-items:flex-start;justify-content:space-between;
+    gap:12px;
+  }
+  .owasp-api-num{
+    font-size:.65rem;letter-spacing:.2em;
+    font-weight:700;text-transform:uppercase;
+    padding:4px 10px;border-radius:2px;
+    white-space:nowrap;margin-top:2px;
+  }
+  .owasp-card-info{flex:1}
+  .owasp-card-name{
+    font-size:1rem;color:#fff;font-weight:700;
+    margin-bottom:6px;line-height:1.3;
+  }
+  .owasp-card-desc{font-size:.78rem;color:var(--text-dim);line-height:1.6}
+  .owasp-test-count{
+    font-size:.7rem;color:var(--text-dim);
+    padding:0 24px 12px;display:flex;align-items:center;gap:6px;
+  }
+  .owasp-test-count span{
+    color:var(--cyan);font-size:.9rem;font-weight:700;
+  }
+  .owasp-tests{
+    border-top:1px solid var(--border);
+    max-height:0;overflow:hidden;
+    transition:max-height .4s ease;
+  }
+  .owasp-card.open .owasp-tests{max-height:500px}
+  .owasp-tests-inner{padding:16px 24px 20px}
+  .test-item{
+    display:flex;align-items:flex-start;gap:10px;
+    padding:7px 0;border-bottom:1px solid rgba(13,48,64,.6);
+    font-size:.75rem;line-height:1.5;
+  }
+  .test-item:last-child{border-bottom:none}
+  .test-id{
+    color:var(--cyan);white-space:nowrap;
+    font-size:.68rem;opacity:.8;flex-shrink:0;
+    padding-top:1px;
+  }
+  .test-name{color:var(--text)}
+  .test-exploit{color:var(--red)}
+  .toggle-icon{
+    font-size:.75rem;color:var(--cyan);
+    transition:transform .3s;flex-shrink:0;
+  }
+  .owasp-card.open .toggle-icon{transform:rotate(180deg)}
+
+  /* Card accent colors */
+  .c1{border-top:2px solid #ff6b35}.c1 .owasp-api-num{background:rgba(255,107,53,.15);color:#ff6b35}
+  .c2{border-top:2px solid #ff2d55}.c2 .owasp-api-num{background:rgba(255,45,85,.15);color:#ff2d55}
+  .c3{border-top:2px solid #ff9f0a}.c3 .owasp-api-num{background:rgba(255,159,10,.15);color:#ff9f0a}
+  .c4{border-top:2px solid #ffd600}.c4 .owasp-api-num{background:rgba(255,214,0,.15);color:#ffd600}
+  .c5{border-top:2px solid #30d158}.c5 .owasp-api-num{background:rgba(48,209,88,.15);color:#30d158}
+  .c6{border-top:2px solid #00e5ff}.c6 .owasp-api-num{background:rgba(0,229,255,.15);color:#00e5ff}
+  .c7{border-top:2px solid #bf5af2}.c7 .owasp-api-num{background:rgba(191,90,242,.15);color:#bf5af2}
+  .c8{border-top:2px solid #0a84ff}.c8 .owasp-api-num{background:rgba(10,132,255,.15);color:#0a84ff}
+  .c9{border-top:2px solid #ff6b35}.c9 .owasp-api-num{background:rgba(255,107,53,.15);color:#ff6b35}
+  .c10{border-top:2px solid #ff2d55}.c10 .owasp-api-num{background:rgba(255,45,85,.15);color:#ff2d55}
+
+  /* ── TERMINAL COMMANDS ── */
+  .commands-grid{display:grid;gap:16px;max-width:860px;margin:0 auto}
+  .cmd-block{
+    background:#000;border:1px solid var(--border);
+    padding:0;overflow:hidden;
+    transition:border-color .3s;
+  }
+  .cmd-block:hover{border-color:var(--cyan)}
+  .cmd-header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 16px;background:rgba(13,48,64,.4);
+    border-bottom:1px solid var(--border);
+  }
+  .cmd-dots{display:flex;gap:6px}
+  .cmd-dot{width:10px;height:10px;border-radius:50%}
+  .cmd-dot:nth-child(1){background:#ff5f57}
+  .cmd-dot:nth-child(2){background:#febc2e}
+  .cmd-dot:nth-child(3){background:#28c840}
+  .cmd-label{font-size:.65rem;color:var(--text-dim);letter-spacing:.1em}
+  .cmd-copy-btn{
+    background:none;border:1px solid var(--dim);color:var(--text-dim);
+    font-family:inherit;font-size:.65rem;padding:3px 10px;cursor:pointer;
+    letter-spacing:.1em;transition:all .2s;border-radius:2px;
+  }
+  .cmd-copy-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+  .cmd-copy-btn.copied{border-color:var(--green);color:var(--green)}
+  .cmd-body{padding:18px 20px;font-size:.84rem;line-height:1.7}
+  .cmd-line{display:flex;gap:10px;align-items:flex-start}
+  .cmd-prompt{color:var(--green);flex-shrink:0;user-select:none}
+  .cmd-text{color:#e0f7ff;word-break:break-all}
+  .cmd-comment{color:var(--text-dim);font-size:.75rem;margin-left:28px;display:block;margin-top:2px}
+
+  /* ── FILE TREE ── */
+  .filetree{
+    background:#000;border:1px solid var(--border);
+    padding:28px 32px;max-width:700px;margin:0 auto;
+    font-size:.82rem;
+  }
+  .ft-title{
+    color:var(--cyan);margin-bottom:20px;font-size:.75rem;
+    letter-spacing:.2em;text-transform:uppercase;
+    display:flex;align-items:center;gap:10px;
+  }
+  .ft-title::after{
+    content:'';flex:1;height:1px;background:var(--border);
+  }
+  .ft-item{
+    display:flex;align-items:center;gap:0;
+    padding:3px 0;color:var(--text);
+    opacity:0;transform:translateX(-10px);
+    animation:ftIn .3s ease forwards;
+  }
+  @keyframes ftIn{to{opacity:1;transform:translateX(0)}}
+  .ft-indent{display:inline-block;width:20px;flex-shrink:0}
+  .ft-branch{color:var(--dim)}
+  .ft-icon{margin-right:8px;flex-shrink:0}
+  .ft-name{transition:color .2s}
+  .ft-name.folder{color:#ffd600}
+  .ft-name.spec{color:var(--cyan)}
+  .ft-name.config{color:#ff9f0a}
+  .ft-name.setup{color:var(--green)}
+  .ft-name.server{color:#bf5af2}
+  .ft-name.vuln{color:var(--red)}
+  .ft-name.workflow{color:#0a84ff}
+  .ft-name.readme{color:#fff}
+  .ft-desc{color:var(--text-dim);font-size:.7rem;margin-left:8px}
+
+  /* ── FOOTER ── */
+  footer{
+    border-top:1px solid var(--border);
+    padding:40px;text-align:center;
+    background:var(--bg2);position:relative;z-index:2;
+  }
+  .footer-links{
+    display:flex;align-items:center;justify-content:center;
+    gap:24px;margin-bottom:16px;flex-wrap:wrap;
+  }
+  .footer-links a{
+    color:var(--text-dim);text-decoration:none;font-size:.8rem;
+    letter-spacing:.1em;transition:color .2s;
+    display:flex;align-items:center;gap:6px;
+  }
+  .footer-links a:hover{color:var(--cyan)}
+  .footer-copy{font-size:.7rem;color:var(--text-dim);letter-spacing:.1em}
+  .footer-copy span{color:var(--cyan)}
+
+  /* ── RESPONSIVE ── */
+  @media(max-width:900px){
+    nav{padding:12px 20px}
+    .nav-links{display:none}
+    section{padding:60px 20px}
+    .owasp-grid{grid-template-columns:1fr}
+    .hero{padding:80px 20px 60px}
+  }
+
+  /* ── SCROLL ANIMATIONS ── */
+  .reveal{opacity:0;transform:translateY(30px);transition:opacity .6s ease,transform .6s ease}
+  .reveal.visible{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<canvas id="matrix-canvas"></canvas>
+
+<div class="wrapper">
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">OWASP API Security Tests</div>
+  <div class="nav-links">
+    <a href="#how-it-works">Nasıl Çalışır</a>
+    <a href="#coverage">Test Kapsamı</a>
+    <a href="#commands">Komutlar</a>
+    <a href="#structure">Yapı</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-grid"></div>
+  <p class="hero-eyebrow">Security Testing Framework</p>
+  <h1 class="hero-title">OWASP API<br><span>Security Top 10</span></h1>
+  <p class="hero-subtitle">Playwright Test Suite</p>
+  <p class="hero-desc">42 güvenlik testi ile OWASP API Security Top 10 (2023) listesindeki tüm kategorileri kapsayan otomatik test süiti. Güvenli ve açıklı API modları ile savunmaları doğrula, açıkları tespit et.</p>
+  <div class="hero-stats">
+    <div class="stat-badge">42 Test</div>
+    <div class="stat-badge">10 Kategori</div>
+    <div class="stat-badge">2 Mod</div>
+  </div>
+  <a href="https://github.com/MustafaYLDZ93/Owasp-Api-Security-Tests-Playwright" target="_blank" class="hero-cta">
+    <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    GitHub'da Görüntüle
+  </a>
+</div>
+
+<!-- HOW IT WORKS -->
+<section id="how-it-works">
+  <div class="section-header reveal">
+    <span class="section-label">// Nasıl Çalışır</span>
+    <h2 class="section-title">İki Mod, Tek Süit</h2>
+    <div class="section-divider"></div>
+  </div>
+  <div class="modes reveal">
+    <div class="mode-card secure">
+      <span class="mode-icon">🔒</span>
+      <div class="mode-title">Güvenli API</div>
+      <div class="mode-cmd">npx playwright test</div>
+      <div class="mode-result pass">✓ 42/42 PASS — Savunmalar doğrulandı</div>
+    </div>
+    <div class="mode-card vuln">
+      <span class="mode-icon">🔓</span>
+      <div class="mode-title">Açıklı API</div>
+      <div class="mode-cmd">npx playwright test --config=playwright.config.vulnerable.ts</div>
+      <div class="mode-result fail">✗ ~16 FAIL — Açıklar tespit edildi</div>
+    </div>
+  </div>
+</section>
+
+<!-- TEST COVERAGE -->
+<section id="coverage" style="max-width:1200px">
+  <div class="section-header reveal">
+    <span class="section-label">// Test Kapsamı</span>
+    <h2 class="section-title">OWASP API Top 10 — Tam Kapsam</h2>
+    <div class="section-divider"></div>
+  </div>
+  <div class="owasp-grid reveal" id="owasp-grid"></div>
+</section>
+
+<!-- COMMANDS -->
+<section id="commands">
+  <div class="section-header reveal">
+    <span class="section-label">// Komutlar</span>
+    <h2 class="section-title">Kurulum &amp; Çalıştırma</h2>
+    <div class="section-divider"></div>
+  </div>
+  <div class="commands-grid reveal" id="commands-grid"></div>
+</section>
+
+<!-- STRUCTURE -->
+<section id="structure">
+  <div class="section-header reveal">
+    <span class="section-label">// Proje Yapısı</span>
+    <h2 class="section-title">Dosya Ağacı</h2>
+    <div class="section-divider"></div>
+  </div>
+  <div class="filetree reveal" id="filetree"></div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-links">
+    <a href="https://github.com/MustafaYLDZ93/Owasp-Api-Security-Tests-Playwright" target="_blank">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+    <a href="https://owasp.org/API-Security/" target="_blank">OWASP API Security</a>
+    <a href="https://playwright.dev" target="_blank">Playwright Docs</a>
+  </div>
+  <p class="footer-copy">Built with <span>Playwright</span> &amp; <span>Node.js</span> &nbsp;·&nbsp; MustafaYLDZ93</p>
+</footer>
+
+</div><!-- /wrapper -->
+
+<script>
+/* ── MATRIX RAIN ── */
+(function(){
+  const c=document.getElementById('matrix-canvas');
+  const ctx=c.getContext('2d');
+  let W,H,cols,drops;
+  const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()_+-=[]{}|;:,./<>?アイウエオカキクケコサシスセソ';
+  function init(){
+    W=c.width=window.innerWidth;H=c.height=window.innerHeight;
+    cols=Math.floor(W/16);drops=Array(cols).fill(1);
+  }
+  function draw(){
+    ctx.fillStyle='rgba(2,11,18,.05)';ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#00e5ff';ctx.font='13px monospace';
+    drops.forEach((y,i)=>{
+      const ch=chars[Math.floor(Math.random()*chars.length)];
+      ctx.fillText(ch,i*16,y*16);
+      if(y*16>H&&Math.random()>.975)drops[i]=0;
+      drops[i]++;
+    });
+  }
+  init();setInterval(draw,55);
+  window.addEventListener('resize',init);
+})();
+
+/* ── OWASP DATA ── */
+const owaspData=[
+  {num:'API1',cls:'c1',name:'Broken Object Level Authorization',short:'BOLA / IDOR',
+   desc:'Nesne düzeyinde yetki kontrolü eksikliğini test eder.',count:10,
+   tests:[
+    {id:'TC-BOLA-01',name:'User A kendi profiline erişebilmeli',exploit:false},
+    {id:'TC-BOLA-02',name:'User B kendi profiline erişebilmeli',exploit:false},
+    {id:'TC-BOLA-03',name:'[EXPLOIT] User B, User A profilini GET ile okuyamamalı',exploit:true},
+    {id:'TC-BOLA-04',name:'[EXPLOIT] User B, User A profilini PUT ile değiştirememeli',exploit:true},
+    {id:'TC-BOLA-05',name:'[EXPLOIT] User B, User A profilini DELETE ile silememeli',exploit:true},
+    {id:'TC-BOLA-06',name:'[EXPLOIT] User B, User A\'ya ait siparişi okuyamamalı',exploit:true},
+    {id:'TC-BOLA-07',name:'[EXPLOIT] Sıralı ID brute-force — 10 farklı ID denenecek',exploit:true},
+    {id:'TC-BOLA-08',name:'Token olmadan kaynaklara erişim engellenmiş olmalı',exploit:false},
+    {id:'TC-BOLA-09',name:'Admin her kullanıcıya erişebilmeli (pozitif kontrol)',exploit:false},
+    {id:'TC-BOLA-10',name:'Hata yanıtı hassas veri sızdırmamalı',exploit:false},
+  ]},
+  {num:'API2',cls:'c2',name:'Broken Authentication',short:'Kimlik Doğrulama Açıkları',
+   desc:'JWT doğrulama hataları, brute-force ve algoritma saldırılarını test eder.',count:5,
+   tests:[
+    {id:'TC-AUTH-01',name:'Geçersiz token ile korumalı endpoint erişimi reddedilmeli',exploit:false},
+    {id:'TC-AUTH-02',name:'Süresi dolmuş token ile erişim reddedilmeli',exploit:false},
+    {id:'TC-AUTH-03',name:'Token olmadan korumalı endpoint erişimi reddedilmeli',exploit:false},
+    {id:'TC-AUTH-04',name:'Brute-force — 10 hatalı deneme sonrası rate-limit devreye girmeli',exploit:true},
+    {id:'TC-AUTH-05',name:'Algoritma karıştırma — alg:none JWT kabul edilmemeli',exploit:true},
+  ]},
+  {num:'API3',cls:'c3',name:'Broken Object Property Level Authorization',short:'Mass Assignment & Data Exposure',
+   desc:'Mass assignment ve hassas alan ifşasını test eder.',count:3,
+   tests:[
+    {id:'TC-BOPLA-01',name:'Kullanıcı kendi rolünü mass-assignment ile yükseltemememeli',exploit:true},
+    {id:'TC-BOPLA-02',name:'Yanıtta hassas alanlar (password, secretKey) olmamalı',exploit:false},
+    {id:'TC-BOPLA-03',name:'PATCH ile sadece izin verilen alanlar güncellenebilmeli',exploit:true},
+  ]},
+  {num:'API4',cls:'c4',name:'Unrestricted Resource Consumption',short:'Kaynak Tüketimi',
+   desc:'Payload boyutu, sayfalama limiti ve rate limiting kontrollerini test eder.',count:3,
+   tests:[
+    {id:'TC-CONS-01',name:'10 MB payload gönderildiğinde 413 dönmeli',exploit:true},
+    {id:'TC-CONS-02',name:'limit=10000 parametresiyle sayfalama throttle edilmeli',exploit:true},
+    {id:'TC-CONS-03',name:'20 paralel istek — rate limit devreye girmeli',exploit:true},
+  ]},
+  {num:'API5',cls:'c5',name:'Broken Function Level Authorization',short:'Fonksiyon Yetki Açıkları',
+   desc:'Normal kullanıcının admin endpoint\'lerine erişimini test eder.',count:3,
+   tests:[
+    {id:'TC-BFLA-01',name:'Normal kullanıcı /api/admin/users erişememeli',exploit:true},
+    {id:'TC-BFLA-02',name:'Normal kullanıcı admin ile kullanıcı silememeli',exploit:true},
+    {id:'TC-BFLA-03',name:'HTTP method değiştirerek bypass edilememeli',exploit:true},
+  ]},
+  {num:'API6',cls:'c6',name:'Unrestricted Access to Sensitive Business Flows',short:'İş Akışı Açıkları',
+   desc:'Race condition, self-referral ve negatif miktar açıklarını test eder.',count:3,
+   tests:[
+    {id:'TC-FLOW-01',name:'10 paralel satın alma — sadece 1 başarılı olmalı (race condition)',exploit:true},
+    {id:'TC-FLOW-02',name:'Referral kodu kendi kendine uygulanamaz (self-referral)',exploit:true},
+    {id:'TC-FLOW-03',name:'Negatif miktar ile sipariş verilememeli',exploit:true},
+  ]},
+  {num:'API7',cls:'c7',name:'Server Side Request Forgery',short:'SSRF',
+   desc:'Webhook URL\'lerinde internal/private adres engelini test eder.',count:6,
+   tests:[
+    {id:'TC-SSRF',name:'AWS metadata 169.254.169.254 reddedilmeli',exploit:true},
+    {id:'TC-SSRF',name:'GCP metadata.google.internal reddedilmeli',exploit:true},
+    {id:'TC-SSRF',name:'localhost:8080/admin internal servis reddedilmeli',exploit:true},
+    {id:'TC-SSRF',name:'127.0.0.1:22 SSH port tarama reddedilmeli',exploit:true},
+    {id:'TC-SSRF',name:'file:///etc/passwd local dosya erişimi reddedilmeli',exploit:true},
+    {id:'TC-SSRF',name:'IPv6 ::1 loopback adresi reddedilmeli',exploit:true},
+  ]},
+  {num:'API8',cls:'c8',name:'Security Misconfiguration',short:'Güvenlik Yapılandırma Hataları',
+   desc:'Güvenlik header\'ları, stack trace, debug endpoint\'leri ve CORS\'u test eder.',count:4,
+   tests:[
+    {id:'TC-MISCONF-01',name:'X-Content-Type-Options, X-Frame-Options, HSTS header\'ları mevcut olmalı',exploit:false},
+    {id:'TC-MISCONF-02',name:'Hata yanıtı stack trace sızdırmamalı',exploit:false},
+    {id:'TC-MISCONF-03',name:'/swagger, /__debug, /actuator, /metrics kapalı olmalı',exploit:true},
+    {id:'TC-MISCONF-04',name:'CORS wildcard (*) hassas endpoint\'lerde kullanılmamalı',exploit:true},
+  ]},
+  {num:'API9',cls:'c9',name:'Improper Inventory Management',short:'Envanter Yönetimi Açıkları',
+   desc:'Eski API versiyonları ve belgelenmemiş endpoint\'leri test eder.',count:2,
+   tests:[
+    {id:'TC-INV-01',name:'API v1 kapalı olmalı veya Deprecation header dönmeli',exploit:true},
+    {id:'TC-INV-02',name:'/api/internal, /api/v0/users, /api/beta/admin erişilemez olmalı',exploit:true},
+  ]},
+  {num:'API10',cls:'c10',name:'Unsafe Consumption of APIs',short:'Güvensiz API Tüketimi',
+   desc:'URL whitelist, XSS sanitizasyon ve open redirect açıklarını test eder.',count:3,
+   tests:[
+    {id:'TC-UNSAFE-01',name:'Whitelist dışı webhook URL\'i reddedilmeli',exploit:true},
+    {id:'TC-UNSAFE-02',name:'XSS payload sanitize edilip servis edilmemeli',exploit:true},
+    {id:'TC-UNSAFE-03',name:'Open redirect — dış URL\'e yönlendirme olmamalı',exploit:true},
+  ]},
+];
+
+/* ── RENDER OWASP CARDS ── */
+const grid=document.getElementById('owasp-grid');
+owaspData.forEach(cat=>{
+  const card=document.createElement('div');
+  card.className=`owasp-card ${cat.cls}`;
+  const testsHtml=cat.tests.map(t=>`
+    <div class="test-item">
+      <span class="test-id">${t.id}</span>
+      <span class="test-name ${t.exploit?'test-exploit':''}">${t.name}</span>
+    </div>`).join('');
+  card.innerHTML=`
+    <div class="owasp-card-header">
+      <div class="owasp-card-info">
+        <div class="owasp-card-name">${cat.name}</div>
+        <div class="owasp-card-desc">${cat.desc}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0">
+        <span class="owasp-api-num">${cat.num}</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+    </div>
+    <div class="owasp-test-count"><span>${cat.count}</span> test vakası</div>
+    <div class="owasp-tests"><div class="owasp-tests-inner">${testsHtml}</div></div>`;
+  card.addEventListener('click',()=>card.classList.toggle('open'));
+  grid.appendChild(card);
+});
+
+/* ── RENDER COMMANDS ── */
+const cmds=[
+  {label:'Kurulum',lines:[
+    {p:'$',t:'npm install && cd api-server && npm install',c:'Tüm bağımlılıkları kur'}
+  ]},
+  {label:'Güvenli API — Tüm testler PASS beklenir',lines:[
+    {p:'$',t:'npx playwright test',c:'42/42 PASS — API sunucusu otomatik başlar'}
+  ]},
+  {label:'Açıklı API — Güvenlik açıkları tespit edilir',lines:[
+    {p:'$',t:'npx playwright test --config=playwright.config.vulnerable.ts',c:'~16 FAIL — Açıklar raporlanır'}
+  ]},
+  {label:'Belirli test dosyası',lines:[
+    {p:'$',t:'npx playwright test bola.security.spec.ts',c:'Sadece BOLA testleri'},
+    {p:'$',t:'npx playwright test owasp-api-top10.security.spec.ts',c:'Sadece OWASP Top 10 testleri'}
+  ]},
+  {label:'HTML Rapor',lines:[
+    {p:'$',t:'npx playwright test',c:''},
+    {p:'$',t:'npx playwright show-report',c:'Tarayıcıda interaktif raporu aç'}
+  ]},
+];
+const cmdGrid=document.getElementById('commands-grid');
+cmds.forEach(cmd=>{
+  const el=document.createElement('div');
+  el.className='cmd-block';
+  const linesHtml=cmd.lines.map(l=>`
+    <div class="cmd-line">
+      <span class="cmd-prompt">${l.p}</span>
+      <span class="cmd-text">${l.t}</span>
+    </div>
+    ${l.c?`<span class="cmd-comment"># ${l.c}</span>`:''}`).join('');
+  const allText=cmd.lines.map(l=>l.t).join('\n');
+  el.innerHTML=`
+    <div class="cmd-header">
+      <div class="cmd-dots"><div class="cmd-dot"></div><div class="cmd-dot"></div><div class="cmd-dot"></div></div>
+      <span class="cmd-label">${cmd.label}</span>
+      <button class="cmd-copy-btn" onclick="copyCmd(this,'${allText.replace(/'/g,"\\'")}')">Kopyala</button>
+    </div>
+    <div class="cmd-body">${linesHtml}</div>`;
+  cmdGrid.appendChild(el);
+});
+
+function copyCmd(btn,text){
+  navigator.clipboard.writeText(text).then(()=>{
+    btn.textContent='Kopyalandı!';btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent='Kopyala';btn.classList.remove('copied')},2000);
+  });
+}
+
+/* ── RENDER FILE TREE ── */
+const ftItems=[
+  {depth:0,icon:'📁',name:'playwright-API-Security-Tests/',cls:'folder',desc:''},
+  {depth:1,icon:'📄',name:'bola.security.spec.ts',cls:'spec',desc:'— API1 BOLA testleri (10 test)'},
+  {depth:1,icon:'📄',name:'owasp-api-top10.security.spec.ts',cls:'spec',desc:'— API2–10 testleri (32 test)'},
+  {depth:1,icon:'⚙️',name:'playwright.config.ts',cls:'config',desc:'— Güvenli API konfigürasyonu'},
+  {depth:1,icon:'⚙️',name:'playwright.config.vulnerable.ts',cls:'config',desc:'— Açıklı API konfigürasyonu'},
+  {depth:1,icon:'🟢',name:'global-setup.ts',cls:'setup',desc:'— Sunucuyu otomatik başlatır'},
+  {depth:1,icon:'🔴',name:'global-teardown.ts',cls:'setup',desc:'— Sunucuyu otomatik durdurur'},
+  {depth:1,icon:'📁',name:'api-server/',cls:'folder',desc:''},
+  {depth:2,icon:'🔒',name:'server.js',cls:'server',desc:'— Güvenli API (port 3000)'},
+  {depth:2,icon:'🔓',name:'server-vulnerable.js',cls:'vuln',desc:'— Açıklı API (port 3001)'},
+  {depth:2,icon:'📦',name:'package.json',cls:'',desc:''},
+  {depth:1,icon:'📁',name:'.github/workflows/',cls:'folder',desc:''},
+  {depth:2,icon:'🔵',name:'security-tests.yml',cls:'workflow',desc:'— GitHub Actions CI/CD'},
+  {depth:1,icon:'📦',name:'package.json',cls:'',desc:''},
+  {depth:1,icon:'📖',name:'README.md',cls:'readme',desc:'— Dokümantasyon'},
+  {depth:1,icon:'🚫',name:'.gitignore',cls:'',desc:''},
+];
+const ft=document.getElementById('filetree');
+ft.innerHTML=`<div class="ft-title">Dosya Yapısı</div>`;
+ftItems.forEach((item,i)=>{
+  const el=document.createElement('div');
+  el.className='ft-item';
+  el.style.animationDelay=`${i*0.04}s`;
+  const indent='<span class="ft-indent"></span>'.repeat(item.depth);
+  const branch=item.depth>0?`<span class="ft-branch">${i===ftItems.length-1||ftItems[i+1]?.depth<item.depth?'└─':'├─'} </span>`:'';
+  el.innerHTML=`${indent}${branch}<span class="ft-icon">${item.icon}</span><span class="ft-name ${item.cls}">${item.name}</span><span class="ft-desc">${item.desc}</span>`;
+  ft.appendChild(el);
+});
+
+/* ── SCROLL REVEAL ── */
+const observer=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible')});
+},{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+</script>
+</body>
+</html>
