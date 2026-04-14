@@ -1,0 +1,21 @@
+{
+  "name": "playwright-api-security-tests",
+  "version": "1.0.0",
+  "description": "OWASP API Security Top 10 (2023) test suite with Playwright",
+  "scripts": {
+    "install:all": "npm install && cd api-server && npm install",
+    "pretest": "cd api-server && npm install --silent",
+    "test": "playwright test",
+    "test:bola": "playwright test bola.security.spec.ts",
+    "test:owasp": "playwright test owasp-api-top10.security.spec.ts",
+    "test:headed": "playwright test --reporter=list",
+    "report": "playwright show-report",
+    "start:api": "node api-server/server.js",
+    "start:api:vulnerable": "node api-server/server-vulnerable.js",
+    "test:vulnerable": "playwright test --config=playwright.config.vulnerable.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^20.0.0"
+  }
+}

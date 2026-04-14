@@ -1,0 +1,107 @@
+name: OWASP API Security Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_target:
+        description: 'Which API to test against'
+        required: true
+        default: 'secure'
+        type: choice
+        options:
+          - secure        # Tüm testler PASS — savunmalar doğrulandı
+          - vulnerable    # Açıklar tespit edilir — bazı testler FAIL beklenir
+          - both          # Her iki mod da sırayla çalıştırılır
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ─── Job 1: Güvenli API — tüm testler PASS beklenir ────────────────────────
+  test-secure:
+    name: Secure API — All tests should PASS
+    runs-on: ubuntu-latest
+    if: ${{ inputs.test_target == 'secure' || inputs.test_target == 'both' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install API server dependencies
+        run: cd api-server && npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run security tests (Secure API)
+        run: npx playwright test --reporter=list,html
+        env:
+          API_BASE_URL: http://localhost:3000
+          CI: true
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-secure
+          path: playwright-report/
+          retention-days: 30
+
+  # ─── Job 2: Açıklı API — bazı testler FAIL beklenir ────────────────────────
+  test-vulnerable:
+    name: Vulnerable API — Security flaws should be DETECTED (FAILs expected)
+    runs-on: ubuntu-latest
+    if: ${{ inputs.test_target == 'vulnerable' || inputs.test_target == 'both' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install API server dependencies
+        run: cd api-server && npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run security tests (Vulnerable API)
+        # Failures are expected here — exit code ignored so workflow doesn't abort
+        run: npx playwright test --config=playwright.config.vulnerable.ts --reporter=list,html || true
+        env:
+          API_BASE_URL: http://localhost:3001
+          CI: true
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-vulnerable
+          path: playwright-report-vulnerable/
+          retention-days: 30
+
+      - name: Print vulnerability summary
+        if: always()
+        run: |
+          echo "======================================"
+          echo "  Vulnerability Detection Summary"
+          echo "======================================"
+          echo "FAILED tests = detected security flaws"
+          echo "PASSED tests = controls were missing"
+          echo "======================================"

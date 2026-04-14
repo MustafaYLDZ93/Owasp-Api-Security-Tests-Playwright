@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+api-server/node_modules/
+
+# Playwright outputs
+playwright-report/
+playwright-report-vulnerable/
+test-results/
+test-results-vulnerable/
+
+# Runtime files
+.api-server.pid
+
+# Environment variables (may contain secrets)
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# TypeScript build cache
+*.tsbuildinfo
